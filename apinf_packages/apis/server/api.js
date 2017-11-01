@@ -342,7 +342,7 @@ CatalogV1.addCollection(Apis, {
           validateFields, 'url');
 
         if (!isValid) {
-          return errorMessagePayload(400, 'Parameter "url" is erroneous.');
+          return errorMessagePayload(400, 'Parameter "url" must be a valid URL with http(s).');
         }
 
         // Check if API with same name already exists
@@ -407,7 +407,6 @@ CatalogV1.addCollection(Apis, {
         };
       },
     },
-
     // Modify the entity with the given :id with the data contained in the request body.
     put: {
       authRequired: true,
