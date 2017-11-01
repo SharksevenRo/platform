@@ -11,6 +11,7 @@ import { Roles } from 'meteor/alanning:roles';
 
 // Collection imports
 import Apis from '/apinf_packages/apis/collection';
+import ApiDocs from '/apinf_packages/api_docs/collection';
 import ProxyBackends from '/apinf_packages/proxy_backends/collection';
 
 // APInf imports
@@ -152,11 +153,22 @@ CatalogV1.addCollection(Apis, {
 
           // Instead of API URL, return API Proxy's URL, if it exists
           const proxyBackend = ProxyBackends.findOne({ apiId: api._id });
-          // If Proxy is API Umbrella, fill in proxy URL
+
+          // If Proxy is API Umbrella
           if (proxyBackend && proxyBackend.type === 'apiUmbrella') {
-            const url = proxyBackend.proxyUrl().concat(proxyBackend.frontendPrefix());
-            api.url = url;
+            // Get connected proxy url
+            const proxyUrl = proxyBackend.proxyUrl();
+            // Get proxy backend path
+            const frontendPrefix = proxyBackend.frontendPrefix();
+            // Provide full proxy path
+            api.url = proxyUrl.concat(frontendPrefix);
           }
+
+          // Get URl of Swagger specification
+          api.documentationUrl = api.documentationUrl();
+          // Get URL to external site with API documentation
+          api.externalDocumentation = api.otherUrl();
+
           return api;
         });
 
@@ -246,11 +258,21 @@ CatalogV1.addCollection(Apis, {
 
         // Instead of API URL, return API Proxy's URL, if it exists
         const proxyBackend = ProxyBackends.findOne({ apiId: api._id });
+
         // If Proxy is API Umbrella, fill in proxy URL
         if (proxyBackend && proxyBackend.type === 'apiUmbrella') {
-          const url = proxyBackend.proxyUrl().concat(proxyBackend.frontendPrefix());
-          api.url = url;
+          // Get connected proxy url
+          const proxyUrl = proxyBackend.proxyUrl();
+          // Get proxy backend path
+          const frontendPrefix = proxyBackend.frontendPrefix();
+          // Provide full proxy path
+          api.url = proxyUrl.concat(frontendPrefix);
         }
+
+        // Get URl of Swagger specification
+        api.documentationUrl = api.documentationUrl();
+        // Get URL to external site with API documentation
+        api.externalDocumentation = api.otherUrl();
 
         // Construct response
         return {
@@ -384,6 +406,28 @@ CatalogV1.addCollection(Apis, {
           }
         }
 
+        if (bodyParams.documentationUrl) {
+          isValid = ApiDocs.simpleSchema().namedContext()
+            .validateOne({ remoteFileUrl: bodyParams.documentationUrl }, 'remoteFileUrl');
+
+          if (!isValid) {
+            // Error message
+            const message = 'Parameter "documentationUrl" must be a valid URL with http(s).';
+            return errorMessagePayload(400, message);
+          }
+        }
+
+        if (bodyParams.externalDocumentation) {
+          isValid = ApiDocs.simpleSchema().namedContext()
+            .validateOne({ otherUrl: bodyParams.externalDocumentation }, 'otherUrl');
+
+          if (!isValid) {
+            // Error message
+            const message = 'Parameter "externalDocumentation" must be a valid URL with http(s).';
+            return errorMessagePayload(400, message);
+          }
+        }
+
         // Add manager IDs list into
         const apiData = Object.assign({ managerIds: [userId] }, bodyParams);
 
@@ -395,6 +439,24 @@ CatalogV1.addCollection(Apis, {
           return errorMessagePayload(500, 'Inserting API into database failed.');
         }
 
+
+        // Make sure a user provides some Documentation data & API is created
+        if (bodyParams.documentationUrl || bodyParams.externalDocumentation) {
+          ApiDocs.insert({
+            apiId,
+            type: 'url',
+            otherUrl: bodyParams.externalDocumentation,
+            remoteFileUrl: bodyParams.documentationUrl,
+          });
+        }
+
+        const api = Apis.findOne(apiId);
+
+        // Get URl of OpenAPI specification
+        api.documentationUrl = bodyParams.documentationUrl;
+        // Get URL to external site with API documentation
+        api.externalDocumentation = bodyParams.externalDocumentation;
+
         // Give user manager role
         Roles.addUsersToRoles(userId, 'manager');
 
@@ -402,7 +464,7 @@ CatalogV1.addCollection(Apis, {
           statusCode: 201,
           body: {
             status: 'success',
-            data: Apis.findOne(apiId),
+            data: api,
           },
         };
       },
@@ -518,15 +580,67 @@ CatalogV1.addCollection(Apis, {
           }
         }
 
+        const documentationUrl = bodyParams.documentationUrl;
+        const externalDocumentation = bodyParams.externalDocumentation;
+
+        // Make sure a user provides data and it isn't empty string
+        if (documentationUrl && documentationUrl !== '') {
+          const isValid = ApiDocs.simpleSchema().namedContext()
+            .validateOne({ remoteFileUrl: documentationUrl }, 'remoteFileUrl');
+
+          if (!isValid) {
+            // Error message
+            const message = 'Parameter "documentationUrl" must be a valid URL with http(s).';
+            return errorMessagePayload(400, message);
+          }
+        }
+
+        // Make sure a user provides data and it isn't empty string
+        if (externalDocumentation && externalDocumentation !== '') {
+          const isValid = ApiDocs.simpleSchema().namedContext()
+            .validateOne({ otherUrl: externalDocumentation }, 'otherUrl');
+
+          if (!isValid) {
+            // Error message
+            const message = 'Parameter "externalDocumentation" must be a valid URL with http(s).';
+            return errorMessagePayload(400, message);
+          }
+        }
+        const apiDoc = ApiDocs.findOne({ apiId });
+
+        if (apiDoc) {
+
+        } else {
+          // API doesn't have documentation yet
+        }
+
+        // If both values are empty then remove the related apiDoc instance
+        if (documentationUrl !== '' && externalDocumentation !== '') {
+
+        }
+
+        // Make sure a user provides Documentation data & API is created
+        ApiDocs.update(
+          { apiId, $or: [{ fileId: { $exists: true } }, { remoteFileUrl: { $exists: true } }] },
+          { $set: {
+            type: 'url',
+            remoteFileUrl: bodyParams.documentationUrl,
+            otherUrl: bodyParams.externalDocumentation,
+            fileId: ''
+          },
+        });
+
         // Update API document
         Apis.update(apiId, { $set: bodyParams });
+
+        const apiDocs = ApiDocs.findOne({ apiId, $or: [{ fileId: { $exists: true } }, { remoteFileUrl: { $exists: true } }] });
 
         // OK response with API data
         return {
           statusCode: 200,
           body: {
             status: 'success',
-            data: Apis.findOne(apiId),
+            data: Object.assign(Apis.findOne(apiId), apiDocs),
           },
         };
       },
