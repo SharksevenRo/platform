@@ -464,7 +464,10 @@ CatalogV1.addCollection(Apis, {
         const bodyParams = this.bodyParams;
         // Get ID of API
         const apiId = this.urlParams.id;
+        // Get current user ID
         const userId = this.userId;
+
+        // Find API with specified ID
         const api = Apis.findOne(apiId);
 
         // API doesn't exist
@@ -479,12 +482,12 @@ CatalogV1.addCollection(Apis, {
 
         // validate values
         const validateFields = {
-          description: this.bodyParams.description,
-          lifecycleStatus: this.bodyParams.lifecycleStatus,
+          description: bodyParams.description,
+          lifecycleStatus: bodyParams.lifecycleStatus,
         };
 
         // Description must not exceed field length in DB
-        if (this.bodyParams.description) {
+        if (bodyParams.description) {
           const isValid = Apis.simpleSchema().namedContext().validateOne(
             validateFields, 'description');
 
@@ -494,7 +497,7 @@ CatalogV1.addCollection(Apis, {
         }
 
         // Is value of lifecycle status allowed
-        if (this.bodyParams.lifecycleStatus) {
+        if (bodyParams.lifecycleStatus) {
           const isValid = Apis.simpleSchema().namedContext().validateOne(
             validateFields, 'lifecycleStatus');
 
@@ -504,11 +507,13 @@ CatalogV1.addCollection(Apis, {
         }
 
         // Is the API set to public or private
-        if (this.bodyParams.isPublic) {
-          if (this.bodyParams.isPublic === 'true') {
-            this.bodyParams.isPublic = true;
-          } else if (this.bodyParams.isPublic === 'false') {
-            this.bodyParams.isPublic = false;
+        const isPublicParam = bodyParams.isPublic;
+
+        if (isPublicParam) {
+          if (isPublicParam === 'true') {
+            bodyParams.isPublic = true;
+          } else if (isPublicParam === 'false') {
+            bodyParams.isPublic = false;
           } else {
             return errorMessagePayload(400, 'Parameter isPublic has erroneous value.');
           }
