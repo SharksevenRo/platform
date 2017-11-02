@@ -44,7 +44,7 @@ services:
       - UPSTREAM=apinf:3000
     ports:
       - "443:443"
-      - "80:80"
+      - "8765:80"
     volumes:
       - letsencrypt:/etc/letsencrypt
       - letsencrypt_backups:/var/lib/letsencrypt
