@@ -2,3 +2,5 @@
 FROM jshimko/meteor-launchpad:v1.1.1
 
 MAINTAINER apinf <info@apinf.io>
+
+ADD ../.meteor /opt/meteor/src/
