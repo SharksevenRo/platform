@@ -3,4 +3,3 @@ FROM jshimko/meteor-launchpad:v1.1.1
 
 MAINTAINER apinf <info@apinf.io>
 
-COPY ../.meteor /opt/meteor/src/
